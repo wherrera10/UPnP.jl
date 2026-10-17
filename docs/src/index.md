@@ -2,7 +2,7 @@
 
 Julia interface to Universal Plg-n-Play, SSDP / Simple Service Discovery Protocol
 
-![Description](assets/upnp-logo-from-wikipedia.png)
+![Description](assets/UPnP-trademark-by-open-connectivity.png)
 
 
 ## Features
