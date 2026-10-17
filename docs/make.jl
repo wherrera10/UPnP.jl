@@ -7,5 +7,5 @@ makedocs(
 
 deploydocs(
     repo = "github.com/wherrera10/UPnP.jl.git",
-    devbranch = "master",  
+    devbranch = "main",  
 )
