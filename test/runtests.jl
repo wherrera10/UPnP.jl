@@ -5,9 +5,9 @@ using Test
 # environment variable ENV[UPNP_NETWORK_TESTS] = "1". 
 # This will run the discover function against your actual LAN.
 
-using .UniversalPlugAndPlay
+using UPnP
 
-@testset "UniversalPlugAndPlay                          " begin
+@testset "UPnP                                              " begin
 
     @testset "Parse a SearchTarget " begin
         @test parse(SearchTarget, "ssdp:all") == All()
@@ -99,7 +99,7 @@ using .UniversalPlugAndPlay
     end
 
     # SOAP XML reply example used for testing XML parsing
-    const router_xml = """<?xml version="1.0"?>
+    router_xml = """<?xml version="1.0"?>
     <root xmlns="urn:schemas-upnp-org:device-1-0">
       <specVersion><major>1</major><minor>0</minor></specVersion>
       <device>
@@ -205,7 +205,7 @@ using .UniversalPlugAndPlay
 
     @testset "SOAP envelope                                 " begin
         st = "urn:schemas-upnp-org:service:RenderingControl:1"
-        env = UniversalPlugAndPlay._envelope(st, "SetVolume",
+        env = UPnP._envelope(st, "SetVolume",
                                     (InstanceID = 0, Channel = "Master", Desired = "a<b&c"))
         @test occursin("<u:SetVolume xmlns:u=\"$st\">", env)
         @test occursin("<InstanceID>0</InstanceID>", env)
@@ -216,7 +216,7 @@ using .UniversalPlugAndPlay
         @test occursin("</s:Body></s:Envelope>", env)
 
         # the whole thing must be well-formed XML
-        @test UniversalPlugAndPlay.EzXML.parsexml(env) isa UniversalPlugAndPlay.EzXML.Document
+        @test UPnP.EzXML.parsexml(env) isa UPnP.EzXML.Document
     end
 
     @testset "SOAP responses                                " begin
@@ -229,7 +229,7 @@ using .UniversalPlugAndPlay
             </u:GetExternalIPAddressResponse>
           </s:Body>
         </s:Envelope>"""
-        out = UniversalPlugAndPlay._parse_soap_response(ok, 200)
+        out = UPnP._parse_soap_response(ok, 200)
         @test out == Dict("NewExternalIPAddress" => "203.0.113.7")
 
         fault = """<?xml version="1.0"?>
@@ -247,23 +247,23 @@ using .UniversalPlugAndPlay
             </s:Fault>
           </s:Body>
         </s:Envelope>"""
-        @test_throws UPnPError UniversalPlugAndPlay._parse_soap_response(fault, 500)
-        err = try UniversalPlugAndPlay._parse_soap_response(fault, 500); nothing catch e; e end
+        @test_throws UPnPError UPnP._parse_soap_response(fault, 500)
+        err = try UPnP._parse_soap_response(fault, 500); nothing catch e; e end
         @test err.code == 718
         @test err.description == "ConflictInMappingEntry"
 
-        @test_throws ErrorException UniversalPlugAndPlay._parse_soap_response("not xml at all", 200)
-        @test_throws ErrorException UniversalPlugAndPlay._parse_soap_response("<a/>", 200)  # no Body
+        @test_throws ErrorException UPnP._parse_soap_response("not xml at all", 200)
+        @test_throws ErrorException UPnP._parse_soap_response("<a/>", 200)  # no Body
     end
 
     @testset "M-SEARCH request                              " begin
-        req = UniversalPlugAndPlay.msearch(parse(SearchTarget, "roku:ecp"); mx = 3)
+        req = UPnP.msearch(parse(SearchTarget, "roku:ecp"); mx = 3)
         @test startswith(req, "M-SEARCH * HTTP/1.1\r\n")
         @test occursin("ST: roku:ecp\r\n", req)
         @test occursin("MX: 3\r\n", req)
         @test occursin("MAN: \"ssdp:discover\"", req)
         @test endswith(req, "\r\n\r\n")
-        @test occursin("ST: ssdp:all\r\n", UniversalPlugAndPlay.msearch(All()))
+        @test occursin("ST: ssdp:all\r\n", UPnP.msearch(All()))
     end
 
     if get(ENV, "UPNP_NETWORK_TESTS", "0") == "1"
@@ -277,3 +277,5 @@ using .UniversalPlugAndPlay
         end
     end
 end
+
+true
