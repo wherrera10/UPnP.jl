@@ -153,4 +153,4 @@ The package was inspired by a simple need to find a single custom device type on
 
 ## See also
 
-Full UPnP documentation is available elsewhere. In particular, the [UPnP Device Architecture specification]([https://openconnectivity.org/developer/specifications/upnp-resources/upnp/]) is available from the Open Connectivity Foundation.
+Full UPnP documentation is available elsewhere. In particular, the [UPnP Device Architecture specification](https://openconnectivity.org/developer/specifications/upnp-resources/upnp/) is available from the Open Connectivity Foundation.
