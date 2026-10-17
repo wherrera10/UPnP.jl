@@ -1,6 +1,6 @@
 # UPnP.jl
 
-<img src="https://github.com/wherrera10/UPnP.jl/blob/main/docs/src/assets/upnp-trademark-by-open-connectivity.png">
+<img src="https://github.com/wherrera10/UPnP.jl/blob/main/docs/src/upnp-trademark-by-open-connectivity.png">
 
 A Julia client for **Universal Plug and Play (UPnP)**. Discover devices on your local network, inspect what they offer, and control them.
 
