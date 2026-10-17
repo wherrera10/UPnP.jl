@@ -84,8 +84,6 @@ end
 device_urn(domain, typ, version) = URN(:device, domain, typ, version)
 service_urn(domain, typ, version) = URN(:service, domain, typ, version)
 
-# Accessors for URN fields 
-
 """ Extracts the `schemas-upnp-org` part of `urn:schemas-upnp-org:service:RenderingControl:1`."""
 domain_name(u::URN) = u.domain
 
@@ -173,8 +171,6 @@ Base.tryparse(::Type{URN}, s::AbstractString) =
         e isa ParseURNError ? nothing : rethrow()
     end
 
-# SSDP protocol responses
-
 """ Struct for a parsed SSDP reply. `headers` keys are upper-cased. """
 struct SSDPResponse
     status::String
@@ -224,7 +220,7 @@ msearch(st::SearchTarget; mx::Integer = 10) =
 
 Query the local network for devices responding with SSDP.
 
-`matchtxt` is an optional text or Regex to match, such as "Roku".
+`matchtxt` is optional text (regex, case-insensitive) to match, such as "Roku".
 `st` is the `SearchTarget` to ask for, e.g. `RootDevice()` or
 `parse(SearchTarget, "urn:schemas-upnp-org:device:ZonePlayer:1")`.
 
@@ -233,16 +229,22 @@ matching reply. With no `matchtxt`, all replies are printed until timeout
 (default 10 minutes) or Control-C. Returns `nothing` on timeout.
 """
 function ssdpquery(matchtxt = ""; st::SearchTarget = All(), timeoutsecs = 10 * 60)
-    request = msearch(st)
+    # MX is how long in s devices may randomly delay their reply, so keep 
+    # timeoutsecs well over the MX value timeout to avoid missing responses.
+    request = msearch(st; mx = clamp(floor(Int, timeoutsecs) - 1, 1, 5))
     endtime = time() + timeoutsecs
     try
         while time() < endtime
             udpsock = UDPSocket()
+            timed_out = Ref(false)
             # Force recv() to give up once the time budget is used up.
             timer = Timer(max(0.0, endtime - time())) do _
+                timed_out[] = true
                 close(udpsock)
             end
             try
+                # A fresh UDPSocket must be bound before it counts as open.
+                bind(udpsock, ip"0.0.0.0", 0) || error("Could not bind a UDP socket")
                 send(udpsock, MULTICAST, SERVERPORT, request)
                 reply = String(recv(udpsock))
                 if matchtxt == ""
@@ -255,7 +257,8 @@ function ssdpquery(matchtxt = ""; st::SearchTarget = All(), timeoutsecs = 10 * 6
                     end
                 end
             catch err
-                err isa InterruptException && rethrow() # timer or socket error
+                err isa InterruptException && rethrow()
+                timed_out[] || rethrow()   # only the timeout closing the socket is expected
             finally
                 close(timer)
                 close(udpsock)
@@ -270,7 +273,7 @@ function ssdpquery(matchtxt = ""; st::SearchTarget = All(), timeoutsecs = 10 * 6
 end
 
 """
-    discover(st = All(); timeoutsecs = 5, mx = 3) -> Vector{SSDPResponse}
+    discover(st = All(); timeoutsecs = 5, mx = 3)::Vector{SSDPResponse}
 
 Send one M-SEARCH for `st` and collect every reply received within
 `timeoutsecs`. Duplicate USNs are dropped. Replies are parsed into
@@ -278,14 +281,19 @@ Send one M-SEARCH for `st` and collect every reply received within
 """
 function discover(st::SearchTarget = All(); timeoutsecs = 5, mx = 3)
     udpsock = UDPSocket()
+    timed_out = Ref(false)
     timer = Timer(timeoutsecs) do _
-        close(udpsock)
+        timed_out[] = true
+        close(udpsock)          # makes the blocked recv() throw, ending the loop
     end
     found = SSDPResponse[]
     seen = Set{String}()
     try
+        # A fresh UDPSocket is not "open" until it is bound, so bind to an
+        # ephemeral port before sending or receiving.
+        bind(udpsock, ip"0.0.0.0", 0) || error("Could not bind a UDP socket")
         send(udpsock, MULTICAST, SERVERPORT, msearch(st; mx = mx))
-        while isopen(udpsock)
+        while true
             raw = String(recv(udpsock))
             r = parse_response(raw)
             key = something(r.usn, raw)
@@ -294,10 +302,12 @@ function discover(st::SearchTarget = All(); timeoutsecs = 5, mx = 3)
             push!(found, r)
         end
     catch err
-        err isa InterruptException && rethrow()  # socket closed by timer ends the loop
+        err isa InterruptException && rethrow() # user control-C
+        # The socket being closed by the timer is the normal way out; anything else is an error.
+        timed_out[] || rethrow()
     finally
         close(timer)
-        isopen(udpsock) && close(udpsock)
+        close(udpsock) # safe on an unbound socket, unlike isopen()
     end
     return found
 end
@@ -308,11 +318,11 @@ end
     Note that all such URLs are absolute.
 """
 struct Service
-    service_type::String      # e.g. "urn:schemas-upnp-org:service:RenderingControl:1"
+    service_type::String # e.g. "urn:schemas-upnp-org:service:RenderingControl:1"
     service_id::String
-    scpd_url::String          # Service description (actions or similar state variables)
-    control_url::String       # SOAP endpoint
-    event_sub_url::String     # GENA subscription endpoint
+    scpd_url::String # Service description (actions or similar state variables)
+    control_url::String # SOAP endpoint
+    event_sub_url::String # GENA subscription endpoint
 end
 
 """ Struct to represent a UPnP device. Embedded devices are in `devices`. """
@@ -360,8 +370,8 @@ function _parse_device(node, base, location)
 end
 
 """
-    fetch_device(location; timeout = 5) -> Device
-    fetch_device(response::SSDPResponse; timeout = 5) -> Device
+    fetch_device(location; timeout = 5)::Device
+    fetch_device(response::SSDPResponse; timeout = 5)::Device
 
 Download and parse a device description from its `LOCATION` URL.
 """
@@ -371,7 +381,7 @@ function fetch_device(location::AbstractString; timeout = 5)
 end
 
 """
-    parse_device(xml, location) -> Device
+    parse_device(xml, location)::Device
 
 Parse a UPnP device description document. `location` is the URL it came from,
 used to resolve relative service URLs when the document has no `URLBase`.
@@ -391,7 +401,7 @@ function fetch_device(r::SSDPResponse; kw...)
 end
 
 """
-    find_service(device, target) -> Union{Service,Nothing}
+    find_service(device, target)::Union{Service,Nothing}
 
 Search `device` and its embedded devices for a service. `target` may be a
 service `URN` or a string. The service must match domain and type, and its
@@ -451,7 +461,7 @@ function call_action(service::Service, action::AbstractString; timeout = 5, args
     resp = HTTP.post(service.control_url, headers,
                      _envelope(service.service_type, action, args);
                      status_exception = false,
-                     readtimeout = timeout, connect_timeout = timeout)
+                     request_timeout = timeout, connect_timeout = timeout)
     _parse_soap_response(String(resp.body), resp.status, service.control_url)
 end
 
