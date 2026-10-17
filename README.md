@@ -2,7 +2,7 @@
 
 <img src="https://github.com/wherrera10/UPnP.jl/blob/main/docs/src/upnp-trademark-by-open-connectivity.png">
 
-A Julia client for **Universal Plug and Play (UPnP)**. Discover devices on your local network, inspect what they offer, and control them.
+A Julia client for **Universal Plug and Play (UPnP)**. Functions that discover devices on your local network, inspect what they offer, and control them.
 
 ```julia
 using UPnP
