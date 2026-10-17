@@ -14,5 +14,10 @@ HTTP = "2.1"
 EzXML = "1.2"
 Sockets = "1"
 
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+
 [targets]
 Test = ["Test"]
