@@ -133,7 +133,7 @@ ssdpquery("roku"; st = RootDevice(), timeoutsecs = 30)
 
 ## Security note
 
-UPnP has no authentication. Any device or program on your local network can ask your router to open ports, and a number of consumer routers have had serious UPnP vulnerabilities. You should only create the port mappings you need, use leases that expire, and close open ports when not in common use. Consider disabling UPnP on your router when not using itm then re-enabling it when using this module.  Keep your UPnP queries within the local LAN.
+UPnP has no authentication. Any device or program on your local network can ask your router to open ports, and a number of consumer routers have had serious UPnP vulnerabilities. You should only create the port mappings you need, use leases that expire, and close open ports when not in common use. Consider disabling UPnP / SSDP on your router when not using it, then re-enabling it when needed, as when using this module.  Keep SSDP traffic and UPnP queries within the local LAN.
 
 ## Testing setup after installation
 
