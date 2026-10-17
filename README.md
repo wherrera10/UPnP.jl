@@ -129,12 +129,11 @@ ssdpquery("roku"; st = RootDevice(), timeoutsecs = 30)
 - **Port mapping fails with error 725 (`OnlyPermanentLeasesSupported`).** Some routers reject a lease of 0, others reject any non-zero lease. Try the other.
 - **Port mapping fails with error 718 (`ConflictInMappingEntry`).** That external port is already mapped. Delete the old mapping or choose another port.
 - **Wrong internal address.** On machines with several network interfaces (VPNs, Docker, VMs), `getipaddr()` may pick the wrong one. Pass `internal_client` explicitly.
-- **Router has UPnP turned off.** SSDP is disabled by default on many routers for security reasons, 
-after an network flooding attack using SSDP was found in 2014. See the note below.
+- **Router has UPnP turned off.** SSDP is disabled by default on many routers for security reasons after an network flooding attack using SSDP was found in 2014. See the note below.
 
 ## Security note
 
-UPnP has no authentication. Any device or program on your local network can ask your router to open ports, and a number of consumer routers have had serious UPnP vulnerabilities. You should Only create the port mappings you need, use leases that expire, and close open ports when not in common use. Consider disabling UPnP on your router when not using itm then re-enabling it when using this module.  Keep your UPnP queries within the local LAN.
+UPnP has no authentication. Any device or program on your local network can ask your router to open ports, and a number of consumer routers have had serious UPnP vulnerabilities. You should only create the port mappings you need, use leases that expire, and close open ports when not in common use. Consider disabling UPnP on your router when not using itm then re-enabling it when using this module.  Keep your UPnP queries within the local LAN.
 
 ## Testing setup after installation
 
