@@ -5,7 +5,7 @@
 A Julia client for **Universal Plug and Play (UPnP)**. Functions that discover devices on your local network, inspect what they offer, and control them.
 
 [![Documentation Status](https://img.shields.io/badge/docs-latest-blue.svg)](https://wherrera10.github.io/UPnPClient.jl/)
-[![CI](https://github.com/wherrera10/UPnPClient.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/wherrera10/UPnPClient.jl/actions/workflows/ci.yml)
+[![CI](https://github.com/wherrera10/UPnPClient.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/wherrera10/UPnPClient.jl/actions/workflows/CI.yml)
 
 
 ```julia
