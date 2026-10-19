@@ -135,7 +135,11 @@ Decode any legal SSDP search-target string. Throws `SearchTargetParseError`.
 function Base.parse(::Type{SearchTarget}, s::AbstractString)
     s == "ssdp:all" && return AllDevices()
     s == "upnp:rootdevice" && return RootDeviceOnly()
-    startswith(s, "uuid") && return DeviceUUID(String(chopprefix(s, "uuid:")))
+    if startswith(s, "uuid:")
+        value = String(chopprefix(s, "uuid:"))
+        isempty(value) && throw(SearchTargetParseError(String(s)))
+        return DeviceUUID(value)
+    end
     if startswith(s, "urn")
         try
             return parse(UPnPURN, s)
@@ -203,43 +207,39 @@ Send repeated M-SEARCH queries and optionally filter replies.
 `filter_text` is an optional case-insensitive regex.  
 `target` is the `SearchTarget` to request.  
 Returns captured groups (if any), the whole matching reply, or `nothing` on timeout.
+Network and request errors are thrown to the caller.
 """
 function probe_network(filter_text = ""; target::SearchTarget = AllDevices(), timeout_secs = 10 * 60)
     req = _msearch_request(target; mx = clamp(floor(Int, timeout_secs) - 1, 1, 5))
     deadline = time() + timeout_secs
-    try
-        while time() < deadline
-            sock = UDPSocket()
-            expired = Ref(false)
-            tmr = Timer(max(0.0, deadline - time())) do _
-                expired[] = true
-                close(sock)
-            end
-            try
-                bind(sock, ip"0.0.0.0", 0) || error("unable to bind UDP socket")
-                send(sock, SSDP_MULTICAST, SSDP_PORT, req)
-                reply = String(recv(sock))
-                if filter_text == ""
-                    println("Received reply:\r\n$reply")
-                else
-                    rx = Regex(filter_text, "is")
-                    if (m = match(rx, reply)) !== nothing
-                        length(m.captures) > 0 && return m.captures
-                        return reply
-                    end
-                end
-            catch err
-                err isa InterruptException && rethrow()
-                expired[] || rethrow()
-            finally
-                close(tmr)
-                close(sock)
-            end
-            sleep(3)
+    while time() < deadline
+        sock = UDPSocket()
+        expired = Ref(false)
+        tmr = Timer(max(0.0, deadline - time())) do _
+            expired[] = true
+            close(sock)
         end
-    catch y
-        println("Caught error: $y")
-        return ""
+        try
+            bind(sock, ip"0.0.0.0", 0) || error("unable to bind UDP socket")
+            send(sock, SSDP_MULTICAST, SSDP_PORT, req)
+            reply = String(recv(sock))
+            if filter_text == ""
+                println("Received reply:\r\n$reply")
+            else
+                rx = Regex(filter_text, "is")
+                if (m = match(rx, reply)) !== nothing
+                    length(m.captures) > 0 && return m.captures
+                    return reply
+                end
+            end
+        catch err
+            err isa InterruptException && rethrow()
+            expired[] || rethrow()
+        finally
+            close(tmr)
+            close(sock)
+        end
+        sleep(3)
     end
     return nothing
 end
@@ -401,12 +401,24 @@ _xml_escape(s) = replace(string(s),
     '&' => "&amp;", '<' => "&lt;", '>' => "&gt;",
     '"' => "&quot;", '\'' => "&apos;")
 
+function _validate_xml_name(name)
+    occursin(r"^[A-Za-z_][A-Za-z0-9_.-]*$", name) ||
+        throw(ArgumentError("invalid XML element name: $(repr(name))"))
+    name
+end
+
+function _soap_argument(name, value)
+    name = _validate_xml_name(string(name))
+    "<$name>$(_xml_escape(value))</$name>"
+end
+
 function _soap_envelope(type_uri, action, args)
-    inner = join(("<$k>$(_xml_escape(v))</$k>" for (k, v) in pairs(args)))
+    _validate_xml_name(action)
+    inner = join((_soap_argument(k, v) for (k, v) in pairs(args)))
     """<?xml version="1.0"?>""" *
     """<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" """ *
     """s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body>""" *
-    """<u:$action xmlns:u="$type_uri">$inner</u:$action></s:Body></s:Envelope>"""
+    """<u:$action xmlns:u="$(_xml_escape(type_uri))">$inner</u:$action></s:Body></s:Envelope>"""
 end
 
 """
@@ -417,6 +429,8 @@ the ordered input parameters. Returns the output parameters as a dictionary.
 Throws `SoapFault` when the device reports an error.
 """
 function invoke_action(service::ServiceEndpoint, action::AbstractString; timeout = 5, args...)
+    occursin(r"[\r\n\"]", service.type_uri) &&
+        throw(ArgumentError("service type URI contains an invalid SOAP header character"))
     headers = ["Content-Type" => "text/xml; charset=\"utf-8\"",
                "SOAPACTION" => "\"$(service.type_uri)#$action\""]
     resp = HTTP.post(service.control_url, headers,
@@ -457,15 +471,20 @@ const WAN_URNS = (make_service_urn("schemas-upnp-org", "WANIPConnection", 1),
     find_gateway(; timeout_secs = 5)
 
 Discover the first Internet Gateway Device (router) and load its description.
+If replies were received but all device descriptions failed to load, throws a
+`CompositeException` containing those failures.
 """
 function find_gateway(; timeout_secs = 5)
+    errors = Any[]
     for r in collect_replies(GATEWAY_URN; timeout_secs = timeout_secs)
         try
             return load_device(r)
-        catch
-            continue
+        catch err
+            err isa InterruptException && rethrow()
+            push!(errors, err)
         end
     end
+    isempty(errors) || throw(CompositeException(errors))
     error("No Internet Gateway Device found on the network")
 end
 
