@@ -1,4 +1,4 @@
-name = "UPnP"
+name = "UPnPClient"
 uuid = "357f474c-b340-40bc-9c94-1ee5b7b28067"
 authors = ["William Herrera <wherrera@alahonua.com>"]
 version = "0.1.0"
