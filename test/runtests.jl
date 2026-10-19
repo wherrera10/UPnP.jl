@@ -11,6 +11,9 @@ using Test, UPnPClient
         @test parse(SearchTarget, "ssdp:all") == AllDevices()
         @test parse(SearchTarget, "upnp:rootdevice") == RootDeviceOnly()
         @test parse(SearchTarget, "uuid:some-uuid") == DeviceUUID("some-uuid")
+        @test_throws SearchTargetParseError parse(SearchTarget, "uuid")
+        @test_throws SearchTargetParseError parse(SearchTarget, "uuidx")
+        @test_throws SearchTargetParseError parse(SearchTarget, "uuid:")
         @test parse(SearchTarget, "urn:schemas-upnp-org:device:ZonePlayer:1") ==
             UPnPURN(:device, "schemas-upnp-org", "ZonePlayer", 1)
         @test parse(SearchTarget, "urn:schemas-sonos-com:service:Queue:2") ==
@@ -235,6 +238,7 @@ using Test, UPnPClient
         @test occursin("<u:SetVolume xmlns:u=\"$st\">", env)
         @test occursin("<InstanceID>0</InstanceID>", env)
         @test occursin("<Desired>a&lt;b&amp;c</Desired>", env)
+        @test occursin("xmlns:u=\"$st\"", env)
         # argument order is preserved
         @test findfirst("<InstanceID>", env).start <
             findfirst("<Channel>", env).start <
@@ -243,6 +247,12 @@ using Test, UPnPClient
 
         # the whole thing must be well-formed XML
         @test UPnPClient.EzXML.parsexml(env) isa UPnPClient.EzXML.Document
+        escaped_uri = UPnPClient._soap_envelope(
+            "urn:example?one=1&two=2", "Action", NamedTuple())
+        @test occursin("xmlns:u=\"urn:example?one=1&amp;two=2\"", escaped_uri)
+        @test UPnPClient.EzXML.parsexml(escaped_uri) isa UPnPClient.EzXML.Document
+        @test_throws ArgumentError UPnPClient._soap_envelope(st, "Bad><Action", NamedTuple())
+        @test_throws ArgumentError UPnPClient._soap_argument("bad>", "value")
     end
 
     @testset "SOAP responses                                " begin
