@@ -1,11 +1,11 @@
-using Documenter, UPnP
+using Documenter, UPnPClient
 
 makedocs(
-    sitename = "UPnP (Universal Plug-n-Play, SSDP / Simple Service Discovery Protocol) Module Documentation",
+    sitename = "UPnPClient.jl (Universal Plug and Play client)",
     format = Documenter.HTML(prettyurls = false),
 )
 
 deploydocs(
-    repo = "github.com/wherrera10/UPnP.jl.git",
+    repo = "github.com/wherrera10/UPnPClient.jl.git",
     devbranch = "main",  
 )
